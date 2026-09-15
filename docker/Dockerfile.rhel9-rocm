@@ -91,7 +91,10 @@ RUN dnf install -y --allowerasing \
     sqlite \
     numactl-libs \
     numactl \
-    && dnf clean all
+    numactl-devel \
+    && dnf clean all \
+    && test -e /usr/lib64/libnuma.so \
+    && ldconfig
 
 # Install miniconda after system packages are installed
 RUN wget --no-check-certificate https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${OS_TYPE}.sh && \
