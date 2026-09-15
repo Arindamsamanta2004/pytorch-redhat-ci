@@ -525,7 +525,9 @@ jobs:
           print((g @ g.T).sum().item())
           print("ROCm quick sanity gate passed")
           PY
-            python -m pytest /pytorch/test/test_torch.py -q --timeout=120 -k "test_dir or test_type or test_dtypes"
+            # Use shell timeout — pytest-timeout is not in requirements-ci.txt
+            # (--timeout=N makes pytest exit 4 with "unrecognized arguments").
+            timeout 120 python -m pytest /pytorch/test/test_torch.py -q -k "test_dir or test_type or test_dtypes"
           '
 
       - name: Run single-GPU test suite
