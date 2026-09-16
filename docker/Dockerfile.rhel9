@@ -195,7 +195,7 @@ RUN source /miniconda/etc/profile.d/conda.sh && \
     echo "=== Triton installed successfully ===" && \
     export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(which conda))/../'}:${CMAKE_PREFIX_PATH}" && \
     .ci/pytorch/build.sh && \
-    sccache --show-stats > /sccache_stats.txt 2>&1 || true
+    { sccache --show-stats > /sccache_stats.txt 2>&1 || true; }
 
 # Install structural analysis tool for test determination (cloned fresh
 # each build to pick up the latest changes from the private repo)
