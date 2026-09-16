@@ -222,7 +222,7 @@ jobs:
           echo "| HUD push | \`${PUSH_TO_HUD}\` |" >> $GITHUB_STEP_SUMMARY
 
       - name: Report to CRCR
-        if: always() && env.PUSH_TO_HUD == 'true'
+        if: always() && env.PUSH_TO_HUD == 'true' && job.status == 'success'
         continue-on-error: true
         uses: pytorch/test-infra/.github/actions/cross-repo-ci-relay-callback@main
         with:

@@ -153,7 +153,7 @@ jobs:
           echo "| Quay Image | \`${QUAY_TAG}\` |" >> $GITHUB_STEP_SUMMARY
 
       - name: Report to CRCR
-        if: always()
+        if: always() && job.status == 'success'
         continue-on-error: true
         uses: pytorch/test-infra/.github/actions/cross-repo-ci-relay-callback@main
         with:
