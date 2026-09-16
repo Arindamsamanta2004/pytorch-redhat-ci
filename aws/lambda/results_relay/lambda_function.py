@@ -44,11 +44,11 @@ def _verify_oidc_token(token: str, audience: str) -> dict:
 
 def _dispatch_to_receiver(
     payload: dict, source_repo: str, forward_to_hud: bool
-) -> None:
+) -> bool:
     config = get_config()
     if not config.github_token:
-        logger.warning("GITHUB_TOKEN not set — skipping repository_dispatch")
-        return
+        logger.error("GITHUB_TOKEN not set — cannot send repository_dispatch")
+        return False
 
     dispatch_url = (
         f"https://api.github.com/repos/{config.dispatch_repo}/dispatches"
@@ -56,28 +56,35 @@ def _dispatch_to_receiver(
     dispatch_payload = {
         "event_type": "external-ci-result",
         "client_payload": {
-            **payload,
-            "source_repo": source_repo,
-            "forward_to_hud": forward_to_hud,
+            "result": payload,
+            "relay": {
+                "source_repo": source_repo,
+                "forward_to_hud": forward_to_hud,
+            },
         },
     }
 
-    resp = http_requests.post(
-        dispatch_url,
-        json=dispatch_payload,
-        headers={
-            "Authorization": f"token {config.github_token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
-        timeout=10,
-    )
+    try:
+        resp = http_requests.post(
+            dispatch_url,
+            json=dispatch_payload,
+            headers={
+                "Authorization": f"token {config.github_token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            timeout=10,
+        )
+    except http_requests.RequestException as e:
+        logger.error("repository_dispatch request failed: %s", e)
+        return False
+
     if resp.status_code == 204:
         logger.info("repository_dispatch sent to %s", config.dispatch_repo)
-    else:
-        logger.error(
-            "repository_dispatch failed: %d %s", resp.status_code, resp.text
-        )
+        return True
+
+    logger.error("repository_dispatch failed: %d %s", resp.status_code, resp.text)
+    return False
 
 
 def _json_response(status: int, body: dict) -> dict:
@@ -134,7 +141,8 @@ def lambda_handler(event: dict, context: object) -> dict:
     )
 
     forward_to_hud = should_forward_to_hud(source_repo, config.allowlist_url)
-    _dispatch_to_receiver(payload, source_repo, forward_to_hud)
+    if not _dispatch_to_receiver(payload, source_repo, forward_to_hud):
+        return _json_response(502, {"error": "Failed to dispatch result"})
 
     return _json_response(200, {
         "message": "Result received and dispatched",
