@@ -25,6 +25,11 @@ on:
           - sgpu
           - mgpu
           - build-only
+      no_cache:
+        description: "Force podman --no-cache rebuild (busts layer cache so the build really recompiles against sccache)"
+        required: false
+        type: boolean
+        default: true
 
 run-name: >-
   [Nightly-sccache] RHEL 9.6 @ ${{ inputs.sha && format('manual ({0})', inputs.sha) || 'manual' }}${{ inputs.test_categories && inputs.test_categories != 'all' && format(' [{0}]', inputs.test_categories) || '' }}
@@ -117,9 +122,16 @@ jobs:
           PYTORCH_SHA: ${{ steps.sha.outputs.sha }}
           SUBSCRIPTION_KEY: ${{ secrets.RHEL_SUBSCRIPTION_ACTIVATION_KEY }}
           SUBSCRIPTION_ORG: ${{ secrets.RHEL_SUBSCRIPTION_ORG_ID }}
+          NO_CACHE: ${{ inputs.no_cache }}
         run: |
           echo "$SUBSCRIPTION_KEY" > /tmp/sub_key.txt
           echo "$SUBSCRIPTION_ORG" > /tmp/sub_org.txt
+
+          NO_CACHE_FLAG=""
+          if [ "${NO_CACHE}" = "true" ]; then
+            echo "Building with --no-cache (forced full rebuild)"
+            NO_CACHE_FLAG="--no-cache"
+          fi
 
           podman build \
             --file docker/Dockerfile.rhel9-sccache \
@@ -129,6 +141,7 @@ jobs:
             --secret id=subscription_key,src=/tmp/sub_key.txt \
             --secret id=subscription_org,src=/tmp/sub_org.txt \
             ${{ steps.sccache.outputs.volume_arg }} \
+            ${NO_CACHE_FLAG} \
             --tag "${IMAGE_TAG}" \
             .
 
@@ -146,6 +159,7 @@ jobs:
           IMAGE_TAG: ${{ steps.sha.outputs.image_tag }}
           PYTORCH_SHA: ${{ steps.sha.outputs.sha }}
           SCCACHE_CACHE_DIR: ${{ steps.sccache.outputs.cache_dir }}
+          NO_CACHE: ${{ inputs.no_cache }}
         run: |
           echo "## CRCR Nightly: RHEL 9.6 — Build" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -154,6 +168,7 @@ jobs:
           echo "| Nightly SHA | [\`${PYTORCH_SHA}\`](https://github.com/pytorch/pytorch/commit/${PYTORCH_SHA}) |" >> $GITHUB_STEP_SUMMARY
           echo "| Local Image | \`${IMAGE_TAG}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Quay push | \`skipped (test workflow, local image only)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| no_cache | \`${NO_CACHE}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| HUD push | \`${PUSH_TO_HUD}\` |" >> $GITHUB_STEP_SUMMARY
           if [ -d "${SCCACHE_CACHE_DIR}" ]; then
             CACHE_SIZE=$(du -sh "${SCCACHE_CACHE_DIR}" 2>/dev/null | cut -f1 || echo "N/A")
